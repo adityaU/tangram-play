@@ -304,12 +304,12 @@ function getInlineNodes (str, nLine) {
 function yamlAddressing (stream, state) {
     // Once per line compute the KEYS tree, NAME, ADDRESS and LEVEL.
     if (stream.pos === 0) {
-        parseYamlString(stream.string, state, stream.tabSize);
+        parseYamlString(stream.string, state, stream);
     }
 }
 
 // Add Address to token states
-export function parseYamlString (string, state, tabSize) {
+export function parseYamlString (string, state, stream) {
     // TODO:
     //  - add an extra \s* before the :
     //  - break all this into smaller and reusable functions
@@ -319,7 +319,7 @@ export function parseYamlString (string, state, tabSize) {
     let node = regex.exec(string);
 
     // node[0] = all the matching line
-    // node[1] = spaces
+    // node[1] = spaces - DO NOT USE - use stream.indentation() instead.
     // node[2] = key
     // node[3] = "\s*:\s*"
     // node[4] = value (if there is one)
@@ -327,8 +327,12 @@ export function parseYamlString (string, state, tabSize) {
     if (node) {
         //  If looks like a node
         //  Calculate the number of spaces and indentation level
-        let spaces = (node[1].match(/\s/g) || []).length;
-        let level = Math.floor(spaces / tabSize);
+        // TODO: Do not use tabSize to calculate level. Tab size is an editor
+        // preference, and YAML specification does not depend on tab sizes
+        // throughout a document to determine level. It is based on the number
+        // of spaces indented beyond its parent.
+        const spaces = stream.indentation();
+        const level = Math.floor(spaces / stream.tabSize);
 
         //  Update the nodeS tree
         if (level > state.keyLevel) {
@@ -481,7 +485,7 @@ CodeMirror.defineMode('yaml-tangram', function (config, parserConfig) {
     //
     function js (stream, state) {
         let address = getKeyAddressFromState(state.yamlState);
-        if ((!isContentJS(tangramScene, address) || /^\|$/g.test(stream.string))) {
+        if (!isContentJS(tangramScene, address) || /^\|$/g.test(stream.string)) {
             state.token = yaml;
             state.localState = state.localMode = null;
             return null;
